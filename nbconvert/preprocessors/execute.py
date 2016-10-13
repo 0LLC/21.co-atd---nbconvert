@@ -195,6 +195,14 @@ class ExecutePreprocessor(Preprocessor):
         outputs = self.run_cell(cell)
         cell.outputs = outputs
 
+        def is_bash_error(cell, out):
+            # This is a hack.
+            return (
+                out.output_type == 'stream' and
+                cell.source.startswith('%%bash') and
+                out.name == 'stderr'
+            )
+
         if not self.allow_errors:
             for out in outputs:
                 if out.output_type == 'error':
@@ -205,6 +213,17 @@ class ExecutePreprocessor(Preprocessor):
                         ------------------
 
                         {out.ename}: {out.evalue}
+                        """
+                    msg = dedent(pattern).format(out=out, cell=cell)
+                    raise CellExecutionError(msg)
+                if is_bash_error(cell, out):
+                    pattern = u"""\
+                        The bash command produced stderr while executing the following cell:
+                        ------------------
+                        {cell.source}
+                        ------------------
+
+                        {out.text}
                         """
                     msg = dedent(pattern).format(out=out, cell=cell)
                     raise CellExecutionError(msg)
